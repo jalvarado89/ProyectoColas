@@ -15,9 +15,14 @@ class HomeController extends BaseController {
 	|
 	*/
 
-	public function showWelcome()
+	public function index()
 	{
-		return View::make('hello');
+		$this->layout->titulo = 'Home';
+        $this->layout->nest(
+            'content',
+            'vistas.index',
+			array()
+        );
 	}
 
 }
