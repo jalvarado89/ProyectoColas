@@ -14,3 +14,4 @@
 Route::get('/', 'HomeController@index');
 
 Route::resource('Home', 'HomeController');
+Route::post('Home', 'HomeController@create');

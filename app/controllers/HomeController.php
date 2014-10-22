@@ -14,8 +14,8 @@ class HomeController extends BaseController {
 
 	public function create()
 	{
-		$tipo = Input::get('Partes');		
-		$partes = Input::get('Partir');		
+		$tipo = Input::get('Partir');		
+		$partes = Input::get('Partes');		
 		$minutos = Input::get('PartesMinutos');			
 
 		if(Input::hasFile('UploadAudio')) 
@@ -37,7 +37,8 @@ class HomeController extends BaseController {
 	    }
 
 	    $msj = array(
-        'url' =>'public/Upload_Files/'.$name,     
+        'url' =>'public/Upload_Files/', 
+        'name1' => $name,    
         'parts' => $partes,
         'timeperchunk' => $minutos,
         'type1' => $tipo,
@@ -49,11 +50,14 @@ class HomeController extends BaseController {
     	 $json_objmusic =  json_encode($objmusic);
 
 
-          //ponemos en cola  $json_music
-		  ModelCola::cola($json_music);
-		return Response::Json($ruta);
-		
-		//return Redirect::to('Home');
+		 Send::EnviarCola($json_objmusic);
+		 
+				$this->layout->titulo = 'Home';
+				return $this->layout->nest(
+		            'content',
+		            'vistas.index',
+					array()
+		        );
 	}
 
 }

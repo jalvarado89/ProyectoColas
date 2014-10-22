@@ -1,0 +1,21 @@
+﻿drop table Music;
+drop table Part;
+
+Create Table Music(
+	id serial not null primary key,
+	url varchar not null,
+	name1 varchar not null,
+	parts varchar,
+	timeperchunk varchar,
+	type1 integer not null,
+	status int not null
+);
+
+Create Table Part(
+	id serial not null primary key,
+	url varchar not null,
+	Music_id integer not null,
+	Constraint fk1_music_part foreign key (Music_id) references Music(id)
+);
+
+select * from music
