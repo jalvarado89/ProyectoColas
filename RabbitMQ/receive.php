@@ -1,5 +1,8 @@
 <?php
 
+include_once('./Connections/AbstractSql.php');
+include_once('./Connections/PostgreSql.php');
+
 require_once __DIR__ . '/vendor/autoload.php';
 use PhpAmqpLib\Connection\AMQPConnection;
 
@@ -15,11 +18,13 @@ receive();
 		echo ' [*] Waiting for messages. To exit press CTRL+C', "\n";
 
 		$callback = function($msg) {
-		  
+
+		  echo " [x] Received ", $msg->body, "\n";
+
 		  $msj = $msg->body;
 
 		  $MsgArray = json_decode($msj);
-    
+    	    		
 		    $id = $MsgArray->id;
 		    $name = $MsgArray->name1;
 		    $url = $MsgArray->url;
@@ -28,14 +33,14 @@ receive();
 		    $tipo = $MsgArray->type1;
 
 		    if ($tipo == 1) {
-		    	Partir($url, $partes, $name, $id);
+		    	Partir2($url, $partes, $name, $id);
 		    } else {
 		    	PartirMin($url, $partesmin, $name, $id);
 		    }
 		    
 
-		  sleep(substr_count($msg->body, '.'));
-		  $msg->delivery_info['channel']->basic_ack($msg->delivery_info['delivery_tag']);
+		  //sleep(substr_count($msg->body, '.'));
+		  //$msg->delivery_info['name']->basic_ack($msg->delivery_info['delivery_tag']);
 		};
 
 		$channel->basic_qos(null, 1, null);
@@ -49,33 +54,57 @@ receive();
 		$connection->close();
 	}
 
+
+
+
+
+
 	function Partir2($path, $cantidad, $nombre, $id){
+
+		$server       = 'localhost';
+		$database     = 'MusicBox';
+		$user         = 'postgres';
+		$password     = '12345';
+		$driver_class = '\Connections\PostgreSql';
+
+
+		$sql = new $driver_class($server, $database, $user, $password);
+		$sql->connect();
+
+
 		$onlyname = substr($nombre, 0, -4);
-		$url_new = '/Download_Files/';
+		$url_new = 'public/Download_Files/';
 
-	    exec('ffmpeg -i ' . $path . $onlyname .'.mp3' ' -acodec copy -t 00:30:00 -ss 00:00:00 ' . $url_new . $onlyname . '1.mp3');
-
+	    exec('ffmpeg -i ' . $path . $onlyname .'.mp3' . ' -acodec copy -t 00:30:00 -ss 02:55:00 ' . $url_new . $onlyname . '1.mp3');
+	    echo 'ffmpeg -i ' . $path . $onlyname .'.mp3' . ' -acodec copy -t 00:30:00 -ss 00:00:00 ' . $url_new . $onlyname . '1.mp3';
+	    
 	    $fullname = $onlyname . '.mp3';
-	    $ = $url_new . $onlyname . '1.mp3';
-	    $msg_out = array('id' => $id, 'url' => $url_new, 'name1' => $fullname, 'channel' => $canal);
+	    $destino = $url_new . $onlyname . '1.mp3';
+	    $msg_out = array('id' => $id, 'url' => $destino);
 
-	    $msg_out=  json_encode($msg_out);
+	    $msg_out=  json_encode($msg_out);	     
 
-    //response($msg_out, $canal);
+	     $sql->runSql("UPDATE music
+	     SET url = '$url_new',     
+	     status = '1'
+	     WHERE
+	     id = $id;");	     
 
-     $sql->runSql("UPDATE music
-     SET url = '$url_new',     
-     status = '1'
-     WHERE
-     id = $id;");
+	     $sql->runSql("INSERT INTO 
+	     	Part (url, Music_id) 
+	     	VALUES('$destino', $id)");            
 
-     $msj = array(
-        'url' => 'public/Download_Files/' . $fullname, 
-        'Music_id' => $id);
+        $sql->disconnect();
 
-        Part::create($msj);  
-
+        $msj = array(
+	        'url' => $destino, 
+	        'Music_id' => $id);
 	}
+
+
+
+
+
 	function Partir($path, $cantidad){
 	
 		$time = exec("ffmpeg -i " . escapeshellarg($path) . " 2>&1 | grep 'Duration' | cut -d ' ' -f 4 | sed s/,//");
@@ -109,6 +138,12 @@ receive();
 		}
 		unlink($file."new".$o.$extesion);
 	}
+
+
+
+
+
+
 
 	function PartirMin($path, $duracion){
 	
