@@ -10,12 +10,12 @@ class Send {
 		$connection = new AMQPConnection('localhost', 5672, 'guest', 'guest');
 		$channel = $connection->channel();
 
-		$channel->queue_declare('cola', false, true, false, false);
+		$channel->queue_declare('colas', false, true, false, false);
 
 		if(empty($data)) $data = $msj;
 
 		$msg = new AMQPMessage($data, array('delivery_mode' => 2));
-		$channel->basic_publish($msg, '', 'cola');		
+		$channel->basic_publish($msg, '', 'colas');		
 
 		$channel->close();
 		$connection->close();

@@ -13,7 +13,7 @@ receive();
 		$channel = $connection->channel();
 
 
-		$channel->queue_declare('cola', false, true, false, false);
+		$channel->queue_declare('colas', false, true, false, false);
 
 		echo ' [*] Waiting for messages. To exit press CTRL+C', "\n";
 
@@ -31,20 +31,24 @@ receive();
 		    $partes = $MsgArray->parts;
 		    $partesmin = $MsgArray->timeperchunk;
 		    $tipo = $MsgArray->type1;
+		    $status = $MsgArray->status;
 
-		    if ($tipo == 1) {
-		    	Partir2($url, $partes, $name, $id);
-		    } else {
+
+		    if ($status == 0) {
+		    	if ($tipo == 1) {
+		    	Partir($url, $partes, $name, $id);
+		    	} else {
 		    	PartirMin($url, $partesmin, $name, $id);
+		    	}
 		    }
 		    
-
-		  //sleep(substr_count($msg->body, '.'));
-		  //$msg->delivery_info['name']->basic_ack($msg->delivery_info['delivery_tag']);
+		    $sql->runSql("UPDATE music
+	     		SET	status = '1'
+	     		WHERE id = $id;");
+		    		    		  
 		};
 
-		$channel->basic_qos(null, 1, null);
-		$channel->basic_consume('cola', '', false, false, false, false, $callback);
+		$channel->basic_consume('colas', '', false, false, false, false, $callback);
 
 		while(count($channel->callbacks)) {
 		    $channel->wait();
@@ -57,9 +61,7 @@ receive();
 
 
 
-
-
-	function Partir2($path, $cantidad, $nombre, $id){
+	function Partir($path, $cantidad, $nombre, $id){
 
 		$server       = 'localhost';
 		$database     = 'MusicBox';
@@ -70,111 +72,105 @@ receive();
 
 		$sql = new $driver_class($server, $database, $user, $password);
 		$sql->connect();
+		
+		$time = exec("ffmpeg -i " . escapeshellarg('../'.$path . $nombre) . " 2>&1 | grep 'Duration' | cut -d ' ' -f 4 | sed s/,//");
 
-
-		$onlyname = substr($nombre, 0, -4);
-		$url_new = 'public/Download_Files/';
-
-	    exec('ffmpeg -i ' . $path . $onlyname .'.mp3' . ' -acodec copy -t 00:30:00 -ss 02:55:00 ' . $url_new . $onlyname . '1.mp3');
-	    echo 'ffmpeg -i ' . $path . $onlyname .'.mp3' . ' -acodec copy -t 00:30:00 -ss 00:00:00 ' . $url_new . $onlyname . '1.mp3';
-	    
-	    $fullname = $onlyname . '.mp3';
-	    $destino = $url_new . $onlyname . '1.mp3';
-	    $msg_out = array('id' => $id, 'url' => $destino);
-
-	    $msg_out=  json_encode($msg_out);	     
-
-	     $sql->runSql("UPDATE music
-	     SET url = '$url_new',     
-	     status = '1'
-	     WHERE
-	     id = $id;");	     
-
-	     $sql->runSql("INSERT INTO 
-	     	Part (url, Music_id) 
-	     	VALUES('$destino', $id)");            
-
-        $sql->disconnect();
-
-        $msj = array(
-	        'url' => $destino, 
-	        'Music_id' => $id);
-	}
-
-
-
-
-
-	function Partir($path, $cantidad){
-	
-		$time = exec("ffmpeg -i " . escapeshellarg($path) . " 2>&1 | grep 'Duration' | cut -d ' ' -f 4 | sed s/,//");
 		list($hms, $milli) = explode('.', $time);
 		list($hours, $minutes, $seconds) = explode(':', $hms);
 		$total_seconds = ($hours * 3600) + ($minutes * 60) + $seconds;
 		
-		echo "\n";
-		echo $time."\n";
-		echo $hms."\n";
-		echo $total_seconds."\n";
-		echo ($argv[1])."\n";
-
-		$result_division = ($total_seconds/$argv[1]);
-		$file = substr($path, 0, -4);
-		$extesion = substr($path, -4, 4); 
+		$result_division = ($total_seconds/$cantidad);		
+		$file = substr($nombre, 0, -4);		
+		$extesion = ".mp3"; 
 
 		$o=0;
-		for ($i=0; $i < $argv[1]; $i++) { 
+		for ($i=0; $i < $cantidad; $i++) { 
 			
 			if ($i==0){
-				exec("ffmpeg -t ". $result_division ." -i ".$file.$extesion." ".$file.$i.$extesion);
-				exec("ffmpeg -ss ". $result_division ." -i ".$file.$extesion." ".$file."new".$i.$extesion);
+				exec("ffmpeg -t ". $result_division ." -i ". '../'.$path . $nombre." "."audio".$i.$extesion);
+				rename ("audio".$i.$extesion,'../public/Download_Files/'.$file.$i.$extesion);
+				
+				$destino = '../public/Download_Files/'.$file.$i.$extesion;
+	     		$sql->runSql("INSERT INTO 
+	     			Part (url, Music_id) 
+	     			VALUES('$destino', $id)");
+
+				exec("ffmpeg -ss ". $result_division ." -i " . '../'.$path . $nombre." "."audio"."new".$i.$extesion);
 			}else{
-				exec("ffmpeg -t ". $result_division ." -i ".$file."new".$o.$extesion." ".$file.$i.$extesion);
-				exec("ffmpeg -ss ". $result_division ." -i ".$file."new".$o.$extesion." ".$file."new".$i.$extesion);
-				unlink($file."new".$o.$extesion);
+
+				exec("ffmpeg -t ". $result_division ." -i "."audio"."new".$o.$extesion." "."audio".$i.$extesion);
+				rename ("audio".$i.$extesion,'../public/Download_Files/'.$file.$i.$extesion);
+				
+				$destino = '../public/Download_Files/'.$file.$i.$extesion;
+	     		$sql->runSql("INSERT INTO 
+	     			Part (url, Music_id) 
+	     			VALUES('$destino', $id)");
+
+				exec("ffmpeg -ss ". $result_division ." -i "."audio"."new".$o.$extesion." "."audio"."new".$i.$extesion);
+				unlink("audio"."new".$o.$extesion);
 				$o=$i;	
 			}
 			
 		}
-		unlink($file."new".$o.$extesion);
+		unlink("audio"."new".$o.$extesion);	
+
+		$sql->disconnect();
 	}
+                
 
 
 
 
-
-
-
-	function PartirMin($path, $duracion){
+	function PartirMin($path, $cantidad, $nombre, $id){
 	
-			$time = exec("ffmpeg -i " . escapeshellarg($path) . " 2>&1 | grep 'Duration' | cut -d ' ' -f 4 | sed s/,//");
+		$server       = 'localhost';
+		$database     = 'MusicBox';
+		$user         = 'postgres';
+		$password     = '12345';
+		$driver_class = '\Connections\PostgreSql';
+
+		$sql = new $driver_class($server, $database, $user, $password);
+		$sql->connect();
+
+			$time = exec("ffmpeg -i " . escapeshellarg('../'.$path . $nombre) . " 2>&1 | grep 'Duration' | cut -d ' ' -f 4 | sed s/,//");
 			list($hms, $milli) = explode('.', $time);
 			list($hours, $minutes, $seconds) = explode(':', $hms);
 			$total_seconds = ($hours * 3600) + ($minutes * 60) + $seconds;
-			
-			echo "\n";
-			echo $time."\n";
-			echo $hms."\n";
-			echo $total_seconds."\n";
-			echo ($argv[1])."\n";
 
-			$result_division = ($total_seconds/$argv[1]);
-			$file = substr($path, 0, -4);
+			$cantidad = $cantidad * 60;
+			$result_division = ($total_seconds/$cantidad);
+			$file = substr($nombre, 0, -4);
 			$extesion = '.mp3'; 
 
 			$o=0;
 			for ($i=0; $i < $result_division; $i++) { 
 				
 				if ($i==0){
-					exec("ffmpeg -t ". $argv[1]." -i ".$file.$extesion." ".$file.$i.$extesion);
-					exec("ffmpeg -ss ". $argv[1] ." -i ".$file.$extesion." ".$file."new".$i.$extesion);
+					exec("ffmpeg -t ". $cantidad." -i ".'../'.$path . $nombre." "."audio".$i.$extesion);
+					rename ("audio".$i.$extesion,'../public/Download_Files/' .$file.$i.$extesion);
+
+					$destino = '../public/Download_Files/'.$file.$i.$extesion;
+	     				$sql->runSql("INSERT INTO 
+	     				Part (url, Music_id) 
+	     				VALUES('$destino', $id)");
+
+					exec("ffmpeg -ss ". $cantidad ." -i ". '../'.$path . $nombre." "."audio"."new".$i.$extesion);
 				}else{
-					exec("ffmpeg -t ". $argv[1] ." -i ".$file."new".$o.$extesion." ".$file.$i.$extesion);
-					exec("ffmpeg -ss ". $argv[1] ." -i ".$file."new".$o.$extesion." ".$file."new".$i.$extesion);
-					unlink($file."new".$o.$extesion);
-					$o=$i;	
+					exec("ffmpeg -t ". $cantidad ." -i "."audio"."new".$o.$extesion." "."audio".$i.$extesion);
+					rename ("audio".$i.$extesion,'../public/Download_Files/'.$file.$i.$extesion);
+
+					$destino = '../public/Download_Files/'.$file.$i.$extesion;
+		     			$sql->runSql("INSERT INTO 
+		     			Part (url, Music_id) 
+		     			VALUES('$destino', $id)");
+
+					exec("ffmpeg -ss ". $cantidad ." -i "."audio"."new".$o.$extesion." "."audio"."new".$i.$extesion);
+					unlink("audio"."new".$o.$extesion);
+					$o=$i;
 				}
 				
 			}
-			unlink($file."new".$o.$extesion);
-	}
+			unlink("audio"."new".$o.$extesion);
+
+			$sql->disconnect();
+	}                                             

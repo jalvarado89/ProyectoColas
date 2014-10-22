@@ -22,7 +22,7 @@ class HomeController extends BaseController {
 		{
 			$file = Input::file('UploadAudio');
 			$extension = $file->getClientOriginalExtension();
-			$name = substr($file->getClientOriginalName(), 0, 6);
+			$name = trim(substr($file->getClientOriginalName(), 0, 6));
 			$name = $name . '.' . $extension;   		                                 
                 
             $file->move( 'public/Upload_Files/', $name);
